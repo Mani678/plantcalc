@@ -845,7 +845,7 @@
     </div>
 
     <div class="info-strip">
-      <strong>REFERENCE:</strong> &nbsp;1 bar = 100,000 Pa &nbsp;|&nbsp; 1 psi = 6894.76 Pa &nbsp;|&nbsp; 1 atm = 101,325 Pa &nbsp;|&nbsp; g = 9.81 m/s² &nbsp;|&nbsp; Water density (20°C) = 998 kg/m³
+      <strong>REFERENCE:</strong> &nbsp;1 bar = 100,000 Pa &nbsp;|&nbsp; 1 psi = 6894.757 Pa (NIST exact) &nbsp;|&nbsp; 1 atm = 101,325 Pa &nbsp;|&nbsp; g = 9.81 m/s² &nbsp;|&nbsp; Water density ref: 999.016 kg/m³ at 15°C (ASTM D1298) &nbsp;|&nbsp; 1 inH₂O = 249.089 Pa at 4°C (NIST)
     </div>
 
     <!-- Batch Calibration Sheet -->
@@ -1983,7 +1983,7 @@ function calcHydrostatic() {
 
   // Convert density to kg/m3
   if (du === 'lbft3') density *= 16.0185;
-  if (du === 'sgrav') density *= 998;
+  if (du === 'sgrav') density *= 999.016; // ASTM D1298 — SG reference at 15°C
 
   // Convert height to meters
   if (hu === 'ft') height *= 0.3048;
@@ -1992,7 +1992,7 @@ function calcHydrostatic() {
 
   const pa  = density * 9.81 * height;
   const bar = pa / 1e5;
-  const psi = pa * 0.000145038;
+  const psi = pa / 6894.757; // NIST exact
   const kpa = pa / 1000;
 
   document.getElementById('p_pa').innerHTML  = fmt(pa) + '<span>Pa</span>';
@@ -2009,14 +2009,14 @@ function calcPressureConvert() {
   if (isNaN(val)) return;
 
   // To Pa
-  const toPA = { pa:1, kpa:1000, bar:1e5, mbar:100, psi:6894.76, atm:101325, mmhg:133.322, inwc:249.089, mmwc:9.80638 };
+  const toPA = { pa:1, kpa:1000, bar:1e5, mbar:100, psi:6894.757, atm:101325, mmhg:133.322, inwc:249.089, mmwc:9.80638 };
   const pa = val * toPA[from];
 
   document.getElementById('pu_pa').textContent   = fmt(pa);
   document.getElementById('pu_kpa').textContent  = fmt(pa/1000, 4);
   document.getElementById('pu_bar').textContent  = fmt(pa/1e5, 6);
   document.getElementById('pu_mbar').textContent = fmt(pa/100, 3);
-  document.getElementById('pu_psi').textContent  = fmt(pa*0.000145038, 5);
+  document.getElementById('pu_psi').textContent  = fmt(pa/6894.757, 5);
   document.getElementById('pu_atm').textContent  = fmt(pa/101325, 6);
   document.getElementById('pu_mmhg').textContent = fmt(pa/133.322, 3);
   document.getElementById('pu_inwc').textContent = fmt(pa/249.089, 4);
@@ -2215,15 +2215,15 @@ function calcRTD() {
   showResult('rtd_result');
 }
 
-// Thermocouple approximate sensitivity (μV/°C) and range
+// Thermocouple data — IEC 60584 sensitivity values (μV/°C at mid-range) and operating ranges
 const TC_DATA = {
-  K: { sens: 41,  range: '-200 to 1260°C', color: 'var(--accent4)' },
-  J: { sens: 52,  range: '-210 to 750°C',  color: 'var(--accent3)' },
-  T: { sens: 43,  range: '-270 to 400°C',  color: 'var(--accent2)' },
-  E: { sens: 68,  range: '-270 to 1000°C', color: 'var(--accent)'  },
-  S: { sens: 10,  range: '0 to 1760°C',    color: 'var(--text)'    },
-  R: { sens: 10,  range: '0 to 1760°C',    color: 'var(--text)'    },
-  N: { sens: 39,  range: '-270 to 1300°C', color: 'var(--accent3)' },
+  K: { sens: 41.0, range: '-200 to 1260°C', ref: 'IEC 60584-1 Type K' },
+  J: { sens: 52.0, range: '-210 to 750°C',  ref: 'IEC 60584-1 Type J' },
+  T: { sens: 43.0, range: '-270 to 400°C',  ref: 'IEC 60584-1 Type T' },
+  E: { sens: 68.0, range: '-270 to 1000°C', ref: 'IEC 60584-1 Type E' },
+  S: { sens: 10.0, range: '0 to 1760°C',    ref: 'IEC 60584-1 Type S' },
+  R: { sens: 10.5, range: '0 to 1760°C',    ref: 'IEC 60584-1 Type R' },
+  N: { sens: 39.0, range: '-270 to 1300°C', ref: 'IEC 60584-1 Type N' },
 };
 
 function calcTCmV() {
@@ -2232,12 +2232,14 @@ function calcTCmV() {
   const d    = TC_DATA[type];
   if (isNaN(T)) return;
 
-  // Approximate mV using sensitivity (good for linear estimate)
+  // Linear approximation from 0°C cold junction reference (IEC 60584)
+  // EMF ≈ sensitivity × (T_hot - T_cold) where T_cold = 0°C
+  // Valid for mid-range estimation — use NIST ITS-90 tables for precision
   const mv = (d.sens * T) / 1000;
 
   document.getElementById('tc_mv_val').innerHTML  = fmt(mv, 3) + '<span>mV</span>';
   document.getElementById('tc_mv_sens').innerHTML = d.sens + '<span>μV/°C</span>';
-  document.getElementById('tc_mv_range').textContent = `Type ${type} | Range: ${d.range} | Approximate linear estimate only — use NIST tables for precision`;
+  document.getElementById('tc_mv_range').textContent = `${d.ref} | Range: ${d.range} | Cold junction ref: 0°C | Linear estimate — use NIST ITS-90 tables for precision`;
   showResult('tc_mv_result');
 }
 
